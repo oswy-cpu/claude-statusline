@@ -6,8 +6,8 @@ const os = require("os");
 
 const CLAUDE_DIR = path.join(os.homedir(), ".claude");
 const SETTINGS_FILE = path.join(CLAUDE_DIR, "settings.json");
-const STATUSLINE_DEST = path.join(CLAUDE_DIR, "statusline.sh");
-const STATUSLINE_SRC = path.resolve(__dirname, "statusline.sh");
+const STATUSLINE_DEST = path.join(CLAUDE_DIR, "statusline.js");
+const STATUSLINE_SRC = path.resolve(__dirname, "statusline.js");
 
 const blue = "\x1b[38;2;0;153;255m";
 const green = "\x1b[38;2;0;175;80m";
@@ -36,22 +36,14 @@ function checkDeps() {
   const { execSync } = require("child_process");
   const missing = [];
 
-  try {
-    execSync("which jq", { stdio: "ignore" });
-  } catch {
-    missing.push("jq");
-  }
-
-  try {
-    execSync("which curl", { stdio: "ignore" });
-  } catch {
-    missing.push("curl");
-  }
-
-  try {
-    execSync("which git", { stdio: "ignore" });
-  } catch {
-    missing.push("git");
+  // git and curl are the only external deps now (jq is no longer needed)
+  for (const dep of ["curl", "git"]) {
+    try {
+      const cmd = process.platform === "win32" ? `where ${dep}` : `which ${dep}`;
+      execSync(cmd, { stdio: "ignore" });
+    } catch {
+      missing.push(dep);
+    }
   }
 
   return missing;
@@ -65,13 +57,24 @@ function uninstall() {
 
   const backup = STATUSLINE_DEST + ".bak";
 
+  // Also clean up old .sh file if present
+  const oldShFile = path.join(CLAUDE_DIR, "statusline.sh");
+  if (fs.existsSync(oldShFile)) {
+    fs.unlinkSync(oldShFile);
+    success(`Removed old ${dim}statusline.sh${reset}`);
+  }
+  const oldShBak = oldShFile + ".bak";
+  if (fs.existsSync(oldShBak)) {
+    fs.unlinkSync(oldShBak);
+  }
+
   if (fs.existsSync(backup)) {
     fs.copyFileSync(backup, STATUSLINE_DEST);
     fs.unlinkSync(backup);
-    success(`Restored previous statusline from ${dim}statusline.sh.bak${reset}`);
+    success(`Restored previous statusline from ${dim}statusline.js.bak${reset}`);
   } else if (fs.existsSync(STATUSLINE_DEST)) {
     fs.unlinkSync(STATUSLINE_DEST);
-    success(`Removed ${dim}statusline.sh${reset}`);
+    success(`Removed ${dim}statusline.js${reset}`);
   } else {
     warn("No statusline found — nothing to remove");
   }
@@ -81,7 +84,10 @@ function uninstall() {
       const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
       if (settings.statusLine) {
         delete settings.statusLine;
-        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2) + "\n");
+        fs.writeFileSync(
+          SETTINGS_FILE,
+          JSON.stringify(settings, null, 2) + "\n"
+        );
         success(`Removed statusLine from ${dim}settings.json${reset}`);
       } else {
         success("Settings already clean");
@@ -112,12 +118,9 @@ function run() {
   if (missing.length > 0) {
     fail(`Missing required dependencies: ${missing.join(", ")}`);
     log(`  Install them and try again.`);
-    if (missing.includes("jq")) {
-      log(`  ${dim}brew install jq${reset}`);
-    }
     process.exit(1);
   }
-  success("Dependencies found (jq, curl, git)");
+  success("Dependencies found (curl, git)");
 
   if (!fs.existsSync(CLAUDE_DIR)) {
     fs.mkdirSync(CLAUDE_DIR, { recursive: true });
@@ -127,12 +130,23 @@ function run() {
   const backup = STATUSLINE_DEST + ".bak";
   if (fs.existsSync(STATUSLINE_DEST)) {
     fs.copyFileSync(STATUSLINE_DEST, backup);
-    warn(`Backed up existing statusline to ${dim}statusline.sh.bak${reset}`);
+    warn(
+      `Backed up existing statusline to ${dim}statusline.js.bak${reset}`
+    );
   }
 
   fs.copyFileSync(STATUSLINE_SRC, STATUSLINE_DEST);
-  fs.chmodSync(STATUSLINE_DEST, 0o755);
+  if (process.platform !== "win32") {
+    fs.chmodSync(STATUSLINE_DEST, 0o755);
+  }
   success(`Installed statusline to ${dim}${STATUSLINE_DEST}${reset}`);
+
+  // Clean up old .sh file from previous versions
+  const oldShFile = path.join(CLAUDE_DIR, "statusline.sh");
+  if (fs.existsSync(oldShFile)) {
+    fs.unlinkSync(oldShFile);
+    success(`Removed old ${dim}statusline.sh${reset} (migrated to Node.js)`);
+  }
 
   let settings = {};
   if (fs.existsSync(SETTINGS_FILE)) {
@@ -144,9 +158,11 @@ function run() {
     }
   }
 
+  // Use node to run the script — works on all platforms
+  const statuslinePath = path.join(os.homedir(), ".claude", "statusline.js").replace(/\\/g, "/");
   const statusLineConfig = {
     type: "command",
-    command: 'bash "$HOME/.claude/statusline.sh"',
+    command: `node "${statuslinePath}"`,
   };
 
   if (
