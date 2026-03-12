@@ -1,6 +1,6 @@
 {
   "name": "claude-statusline-cross",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A status line for Claude Code CLI showing model, context usage, rate limits, and more",
   "bin": {
     "claude-statusline": "./bin/install.js"

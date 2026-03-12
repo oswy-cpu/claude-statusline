@@ -1,35 +1,27 @@
-# claude-statusline
+# claude-statusline-cross
 
-Configure your Claude Code statusline to show limits, directory and git info
+Configure your Claude Code statusline to show limits, directory and git info. Works on **Windows**, **macOS**, and **Linux**.
 
 ![demo](./.github/demo.png)
 
 ## Install
 
-Run the command below to set it up
-
 ```bash
-npx @kamranahmedse/claude-statusline
+npx claude-statusline-cross
 ```
 
-It backups your old status line if any and copies the status line script to `~/.claude/statusline.sh` and configures your Claude Code settings.
+It backs up your old status line if any, copies the status line script to `~/.claude/statusline.js`, and configures your Claude Code settings.
 
 ## Requirements
 
-- [jq](https://jqlang.github.io/jq/) — for parsing JSON
+- Node.js (already required by Claude Code)
 - curl — for fetching rate limit data
 - git — for branch info
-
-On macOS:
-
-```bash
-brew install jq
-```
 
 ## Uninstall
 
 ```bash
-npx @kamranahmedse/claude-statusline --uninstall
+npx claude-statusline-cross --uninstall
 ```
 
 If you had a previous statusline, it restores it from the backup. Otherwise it removes the script and cleans up your settings.
